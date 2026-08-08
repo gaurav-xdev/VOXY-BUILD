@@ -1,0 +1,21 @@
+[package]
+name = "voxy-overlay"
+description = "VOXY desktop overlay application"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "voxy-overlay"
+path = "src/main.rs"
+
+[dependencies]
+voxy-shared = { path = "../../crates/shared" }
+voxy-event-bus = { path = "../../crates/event_bus" }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+dioxus = { version = "0.6", features = ["desktop", "router"] }
+parking_lot = { workspace = true }
+chrono = { workspace = true }

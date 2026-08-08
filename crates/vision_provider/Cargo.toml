@@ -1,0 +1,24 @@
+[package]
+name = "voxy-vision-provider"
+description = "Vision provider implementations (VLM, local, cloud)"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+voxy-shared = { workspace = true }
+voxy-config = { workspace = true }
+voxy-provider-core = { path = "../provider_core" }
+voxy-vision = { path = "../vision" }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+thiserror = { workspace = true }
+serde = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }
+voxy-orchestrator = { path = "../orchestrator" }

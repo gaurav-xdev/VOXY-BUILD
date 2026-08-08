@@ -1,0 +1,32 @@
+[package]
+name = "voxy-integration"
+description = "OPERATION TITAN FUSION — unified service hub, event bridge, pipeline, telemetry, recovery, and boot sequence"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+voxy-shared = { workspace = true }
+voxy-config = { workspace = true }
+voxy-event-bus = { workspace = true }
+voxy-kernel = { path = "../kernel" }
+voxy-di-container = { path = "../di_container" }
+voxy-health = { workspace = true }
+voxy-cognitive-orchestrator = { path = "../cognitive_orchestrator" }
+voxy-memory = { path = "../memory" }
+voxy-planner = { path = "../planner" }
+voxy-agent-runtime = { path = "../agent_runtime" }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+thiserror = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+tracing = { workspace = true }
+parking_lot = { workspace = true }
+futures = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }

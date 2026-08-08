@@ -1,0 +1,23 @@
+[package]
+name = "voxy-conversation"
+description = "Conversation and session runtime: turn management, barge-in, wake state, context tracking, personality hooks"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+voxy-shared = { workspace = true }
+voxy-audio = { path = "../audio" }
+voxy-personality = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+thiserror = { workspace = true }
+serde = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+tracing = { workspace = true }
+parking_lot = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }

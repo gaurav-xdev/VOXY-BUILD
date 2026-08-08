@@ -1,0 +1,86 @@
+[workspace]
+resolver = "2"
+members = [
+    "apps/*",
+    "crates/*",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["VOXY Engineering Team"]
+license = "MIT"
+repository = "https://github.com/voxy-ai/voxy"
+rust-version = "1.75"
+
+[workspace.dependencies]
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+uuid = { version = "1", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+async-trait = "0.1"
+parking_lot = "0.12"
+zeroize = "1"
+num_cpus = "1"
+hostname = "0.4"
+os_info = "3"
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls", "stream"] }
+futures-util = "0.3"
+futures = "0.3"
+dotenvy = "0.15"
+windows = "0.58"  # features are crate-specific
+
+# Shared crate is referenced by path
+voxy-shared = { path = "crates/shared" }
+voxy-config = { path = "crates/config" }
+voxy-event-bus = { path = "crates/event_bus" }
+voxy-ipc = { path = "crates/ipc" }
+voxy-provider-core = { path = "crates/provider_core" }
+voxy-voice-orchestrator = { path = "crates/voice_orchestrator" }
+voxy-hardware = { path = "crates/hardware" }
+voxy-dependency = { path = "crates/dependency" }
+voxy-runtime = { path = "crates/runtime" }
+voxy-personality = { path = "crates/personality" }
+voxy-guardian = { path = "crates/guardian" }
+voxy-home = { path = "crates/home" }
+voxy-audio = { path = "crates/audio" }
+voxy-world-model = { path = "crates/world_model" }
+voxy-skills = { path = "crates/skills" }
+voxy-cognition = { path = "crates/cognition" }
+voxy-conversation = { path = "crates/conversation" }
+voxy-memory = { path = "crates/memory" }
+voxy-learning = { path = "crates/learning" }
+voxy-orchestrator = { path = "crates/orchestrator" }
+voxy-automation = { path = "crates/automation" }
+voxy-vision = { path = "crates/vision" }
+voxy-context = { path = "crates/context" }
+voxy-companion = { path = "crates/companion" }
+voxy-human-dynamics = { path = "crates/human_dynamics" }
+voxy-brain = { path = "crates/brain" }
+voxy-voice-runtime = { path = "crates/voice_runtime" }
+voxy-companion-intelligence = { path = "crates/companion_intelligence" }
+voxy-visual-presence = { path = "crates/visual_presence" }
+voxy-cognitive-orchestrator = { path = "crates/cognitive_orchestrator" }
+voxy-health = { path = "crates/health" }
+voxy-database = { path = "crates/database" }
+voxy-runtime-guard = { path = "crates/runtime_guard" }
+
+[profile.dev]
+opt-level = 0
+debug = true
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"
+
+[profile.release.build-override]
+opt-level = 3
+

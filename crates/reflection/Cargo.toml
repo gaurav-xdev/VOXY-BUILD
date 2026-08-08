@@ -1,0 +1,19 @@
+[package]
+name = "voxy-reflection"
+description = "Post-execution evaluation and learning"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+voxy-shared = { workspace = true }
+voxy-config = { workspace = true }
+voxy-event-bus = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }

@@ -1,0 +1,29 @@
+[package]
+name = "voxy-production-harden"
+description = "OPERATION OBSIDIAN — stress tests, fault injection, and production certification"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+voxy-shared = { workspace = true }
+voxy-event-bus = { workspace = true }
+voxy-memory = { path = "../memory" }
+voxy-cognitive-orchestrator = { path = "../cognitive_orchestrator" }
+voxy-planner = { path = "../planner" }
+voxy-agent-runtime = { path = "../agent_runtime" }
+voxy-integration = { path = "../integration" }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+thiserror = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+tracing = { workspace = true }
+parking_lot = { workspace = true }
+futures = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }

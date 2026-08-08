@@ -1,0 +1,15 @@
+[package]
+name = "voxy-state-machine"
+description = "Generic lifecycle state machine for runtimes"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+voxy-shared = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }

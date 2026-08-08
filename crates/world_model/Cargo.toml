@@ -1,0 +1,32 @@
+[package]
+name = "voxy-world-model"
+description = "Live representation of the user's environment, desktop state, running applications, connected devices, and active tasks"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+voxy-shared = { workspace = true }
+voxy-hardware = { workspace = true }
+voxy-home = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+thiserror = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+tracing = { workspace = true }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { workspace = true, features = [
+    "Win32_Foundation",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_System_Power",
+    "Win32_System_Threading",
+    "Win32_System_ProcessStatus",
+] }
+
+[dev-dependencies]
+tokio = { workspace = true }

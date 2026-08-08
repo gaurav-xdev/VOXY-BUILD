@@ -1,0 +1,21 @@
+pub mod assembled;
+pub mod confidence;
+pub mod conflict;
+pub mod delta;
+pub mod freshness;
+pub mod invalidation;
+pub mod merger;
+pub mod policy;
+pub mod priority;
+pub mod resolver;
+
+pub use assembled::{AssembledContext, AssembledContextBuilder};
+pub use confidence::ConfidenceEngine;
+pub use conflict::{ConflictResolutionResult, ContextConflict, ContextConflictResolver};
+pub use delta::{ContextDelta, ContextDeltaGenerator};
+pub use freshness::{FreshnessEngine, FreshnessStatus};
+pub use invalidation::{ContextInvalidation, InvalidationResult};
+pub use merger::ContextMerger;
+pub use policy::{ConflictResolution, FusionPolicy, MergeStrategy};
+pub use priority::ContextPriorityResolver;
+pub use resolver::ContextFusionEngine;

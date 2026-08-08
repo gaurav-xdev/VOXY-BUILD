@@ -1,0 +1,16 @@
+[package]
+name = "voxy-kernel"
+description = "Application lifecycle, runtime manager, and service registry"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+voxy-shared = { workspace = true }
+voxy-config = { workspace = true }
+voxy-logging = { path = "../logging" }
+tokio = { workspace = true }
+tracing = { workspace = true }
+async-trait = { workspace = true }
+uuid = { workspace = true }

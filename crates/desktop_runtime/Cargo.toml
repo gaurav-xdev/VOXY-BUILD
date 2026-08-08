@@ -1,0 +1,45 @@
+[package]
+name = "voxy-desktop-runtime"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+description = "VOXY desktop runtime - system tray, auto-launch, hot reload, shortcuts, notifications, clipboard, window management, downloads, settings"
+
+[dependencies]
+voxy-shared = { path = "../shared" }
+voxy-config = { path = "../config" }
+voxy-event-bus = { path = "../event_bus" }
+tokio = { workspace = true }
+tracing = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+parking_lot = { workspace = true }
+thiserror = { workspace = true }
+notify = "7"
+reqwest = { workspace = true }
+futures-util = { workspace = true }
+dirs = "6"
+toml = "0.8"
+tempfile = "3"
+
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.58", features = [
+    "Win32_Foundation",
+    "Win32_UI_WindowsAndMessaging",
+    "Win32_UI_Shell",
+    "Win32_System_Registry",
+    "Win32_System_DataExchange",
+    "Win32_System_Memory",
+    "Win32_System_LibraryLoader",
+    "Win32_Graphics_Gdi",
+    "Win32_Security",
+] }
+
+[dev-dependencies]
+tempfile = "3"
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "test-util"] }
+
+[features]
+default = []

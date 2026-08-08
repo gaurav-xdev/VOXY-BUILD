@@ -1,0 +1,51 @@
+[package]
+name = "voxy-database"
+description = "Storage abstraction layer with SQLite, Postgres, DuckDB, and remote backends"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+voxy-shared = { workspace = true }
+voxy-config = { workspace = true }
+voxy-event-bus = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+async-trait = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+parking_lot = { workspace = true }
+zeroize = { version = "1", features = ["derive"] }
+
+rusqlite = { version = "0.31", features = ["bundled", "backup"], optional = true }
+tokio-postgres = { version = "0.7", optional = true }
+duckdb = { version = "1.0", optional = true }
+reqwest = { version = "0.12", features = ["json"], optional = true }
+aes-gcm = { version = "0.10", optional = true }
+base64 = { version = "0.22", optional = true }
+sha2 = { version = "0.10", optional = true }
+hex = { version = "0.4", optional = true }
+rand = { version = "0.8", optional = true }
+
+[features]
+default = ["sqlite"]
+sqlite = ["dep:rusqlite"]
+postgres = ["dep:tokio-postgres"]
+duckdb = ["dep:duckdb"]
+remote = ["dep:reqwest"]
+encryption = ["dep:aes-gcm", "dep:base64", "dep:sha2", "dep:hex", "dep:rand"]
+all = ["sqlite", "postgres", "duckdb", "remote", "encryption"]
+
+[dev-dependencies]
+tokio = { workspace = true }
+voxy-event-bus = { workspace = true }
+voxy-shared = { workspace = true }
+voxy-health = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+futures = { workspace = true }
+tempfile = "3"

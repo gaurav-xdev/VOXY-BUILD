@@ -1,0 +1,23 @@
+[package]
+name = "voxy-anthropic"
+description = "Anthropic API provider (cloud LLM)"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+voxy-shared = { workspace = true }
+voxy-config = { workspace = true }
+voxy-provider-core = { path = "../provider_core" }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+thiserror = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+reqwest = { workspace = true }
+zeroize = { version = "1", features = ["derive"] }
+
+[dev-dependencies]
+tokio = { workspace = true }

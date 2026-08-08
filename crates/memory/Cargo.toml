@@ -1,0 +1,31 @@
+[package]
+name = "voxy-memory"
+description = "Hermes Memory Runtime: adaptive cognitive memory system with working, short-term, episodic, semantic, procedural, vector memory, knowledge graph, retrieval, consolidation, compression, forgetting, and the Hermes learning engine"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+voxy-shared = { workspace = true }
+voxy-world-model = { path = "../world_model" }
+voxy-skills = { path = "../skills" }
+voxy-cognition = { path = "../cognition" }
+voxy-guardian = { workspace = true }
+voxy-conversation = { path = "../conversation" }
+voxy-personality = { workspace = true }
+voxy-dependency = { workspace = true }
+voxy-provider-core = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+thiserror = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+tracing = { workspace = true }
+parking_lot = { workspace = true }
+rusqlite = { version = "0.31", features = ["bundled"] }
+
+[dev-dependencies]
+tokio = { workspace = true }

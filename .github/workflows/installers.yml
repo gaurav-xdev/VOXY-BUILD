@@ -1,0 +1,152 @@
+name: Build Installers
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      sign:
+        description: 'Sign installers (requires secrets)'
+        required: false
+        default: 'false'
+        type: boolean
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_VERSION: '1.75'
+
+jobs:
+  build-installers:
+    name: Build MSI and NSIS Installers
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Rust ${{ env.RUST_VERSION }}
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ env.RUST_VERSION }}
+          components: rustfmt, clippy
+
+      - name: Cache cargo
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Install WiX Toolset
+        run: |
+          dotnet tool install --global wix --version 4.0.5
+          echo "$env:LOCALAPPDATA\dotnet\tools" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Install NSIS
+        run: |
+          choco install nsis -y --no-progress
+          echo "C:\Program Files (x86)\NSIS" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      - name: Build release binaries
+        run: cargo build --release --locked
+
+      - name: Build MSI installer
+        run: |
+          wix build `
+            --arch x64 `
+            --output voxy.msi `
+            installer\wix\voxy.wixproj
+
+      - name: Build NSIS installer
+        run: makensis /V3 installer\nsis\voxy.nsi
+
+      - name: Verify installers exist
+        run: |
+          if (!(Test-Path "voxy.msi")) { exit 1 }
+          if (!(Test-Path "voxy-0.1.0-setup.exe")) { exit 1 }
+          Write-Host "Both installers built successfully"
+
+      - name: Compute checksums
+        run: |
+          Get-FileHash voxy.msi -Algorithm SHA256 | Select-Object -ExpandProperty Hash | Out-File -FilePath voxy.msi.sha256 -NoNewline
+          Get-FileHash voxy-0.1.0-setup.exe -Algorithm SHA256 | Select-Object -ExpandProperty Hash | Out-File -FilePath voxy-0.1.0-setup.exe.sha256 -NoNewline
+
+      - name: Sign MSI (optional)
+        if: github.event.inputs.sign == 'true'
+        env:
+          CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          if ($env:CERTIFICATE) {
+            $cert = [System.Convert]::FromBase64String($env:CERTIFICATE)
+            $certPath = Join-Path $env:RUNNER_TEMP "cert.pfx"
+            [System.IO.File]::WriteAllBytes($certPath, $cert)
+            & "C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe" sign `
+              /f $certPath `
+              /p $env:CERTIFICATE_PASSWORD `
+              /tr http://timestamp.digicert.com `
+              /td sha256 `
+              /fd sha256 `
+              voxy.msi
+            Remove-Item $certPath
+            Write-Host "MSI signed successfully"
+          } else {
+            Write-Host "No certificate provided — skipping signing"
+          }
+
+      - name: Sign NSIS (optional)
+        if: github.event.inputs.sign == 'true'
+        env:
+          CERTIFICATE: ${{ secrets.WINDOWS_CERTIFICATE }}
+          CERTIFICATE_PASSWORD: ${{ secrets.WINDOWS_CERTIFICATE_PASSWORD }}
+        run: |
+          if ($env:CERTIFICATE) {
+            $cert = [System.Convert]::FromBase64String($env:CERTIFICATE)
+            $certPath = Join-Path $env:RUNNER_TEMP "cert.pfx"
+            [System.IO.File]::WriteAllBytes($certPath, $cert)
+            & "C:\Program Files (x86)\Windows Kits\10\bin\10.0.22621.0\x64\signtool.exe" sign `
+              /f $certPath `
+              /p $env:CERTIFICATE_PASSWORD `
+              /tr http://timestamp.digicert.com `
+              /td sha256 `
+              /fd sha256 `
+              voxy-0.1.0-setup.exe
+            Remove-Item $certPath
+            Write-Host "NSIS signed successfully"
+          } else {
+            Write-Host "No certificate provided — skipping signing"
+          }
+
+      - name: Upload MSI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: voxy-installer-msi
+          path: |
+            voxy.msi
+            voxy.msi.sha256
+
+      - name: Upload NSIS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: voxy-installer-nsis
+          path: |
+            voxy-0.1.0-setup.exe
+            voxy-0.1.0-setup.exe.sha256
+
+      - name: Attach to GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            voxy.msi
+            voxy.msi.sha256
+            voxy-0.1.0-setup.exe
+            voxy-0.1.0-setup.exe.sha256
+          fail_on_unmatched_files: true

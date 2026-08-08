@@ -1,0 +1,2 @@
+[env]
+CMAKE_CXX_FLAGS_RELEASE = "/utf-8 -nologo -MD -Brepro -W0 /O2 /Ob2 /DNDEBUG"

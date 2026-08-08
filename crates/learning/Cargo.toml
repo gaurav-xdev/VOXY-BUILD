@@ -1,0 +1,27 @@
+[package]
+name = "voxy-learning"
+description = "Adaptive Learning Runtime: preference evolution, behavior adaptation, reinforcement hooks, confidence calibration, user feedback processing, strategy evolution, learning policies, adaptive thresholds"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+voxy-shared = { workspace = true }
+voxy-memory = { path = "../memory" }
+voxy-world-model = { path = "../world_model" }
+voxy-cognition = { path = "../cognition" }
+voxy-skills = { path = "../skills" }
+voxy-personality = { workspace = true }
+voxy-event-bus = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+thiserror = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }

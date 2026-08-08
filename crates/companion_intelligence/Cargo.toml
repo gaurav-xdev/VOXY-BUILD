@@ -1,0 +1,28 @@
+[package]
+name = "voxy-companion-intelligence"
+description = "Companion Intelligence Layer -- emotional state, conversation memory, proactive intelligence, personality dynamics"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+voxy-companion = { path = "../companion" }
+voxy-shared = { path = "../shared" }
+voxy-event-bus = { path = "../event_bus" }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+thiserror = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+tracing = { workspace = true }
+parking_lot = { workspace = true }
+sysinfo = "0.30"
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }

@@ -1,0 +1,25 @@
+[package]
+name = "voxy-brain"
+description = "Unified Brain Orchestrator — integrates Context, Companion, Human Dynamics, and Cognition runtimes into a single async event-driven pipeline"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+voxy-context = { path = "../context" }
+voxy-companion = { path = "../companion" }
+voxy-human-dynamics = { path = "../human_dynamics" }
+voxy-cognition = { path = "../cognition" }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+thiserror = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+tracing = { workspace = true }
+parking_lot = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }

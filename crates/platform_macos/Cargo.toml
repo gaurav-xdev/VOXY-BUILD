@@ -1,0 +1,16 @@
+[package]
+name = "voxy-platform-macos"
+description = "macOS platform stub (future)"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+voxy-platform-core = { path = "../platform_core" }
+voxy-shared = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }

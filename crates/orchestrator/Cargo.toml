@@ -1,0 +1,43 @@
+[package]
+name = "voxy-orchestrator"
+description = "System orchestrator coordinating all VOXY runtimes: voice, conversation, memory, learning, world model, guardian, automation, vision, providers, plugins, home, hardware, personality, executor, planner, reflection"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+voxy-shared = { workspace = true }
+voxy-cognition = { path = "../cognition" }
+voxy-conversation = { path = "../conversation" }
+voxy-memory = { path = "../memory" }
+voxy-learning = { path = "../learning" }
+voxy-world-model = { path = "../world_model" }
+voxy-skills = { path = "../skills" }
+voxy-guardian = { workspace = true }
+voxy-voice-orchestrator = { workspace = true }
+voxy-voice = { path = "../voice" }
+voxy-hardware = { workspace = true }
+voxy-personality = { workspace = true }
+voxy-home = { workspace = true }
+voxy-dependency = { workspace = true }
+voxy-runtime = { workspace = true }
+voxy-provider-core = { workspace = true }
+voxy-event-bus = { workspace = true }
+voxy-vision = { path = "../vision" }
+voxy-plugin-runtime = { path = "../plugin_runtime" }
+voxy-executor = { path = "../executor" }
+voxy-planner = { path = "../planner" }
+voxy-reflection = { path = "../reflection" }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+thiserror = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+tracing = { workspace = true }
+parking_lot = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }

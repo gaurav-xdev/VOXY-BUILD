@@ -1,0 +1,17 @@
+[package]
+name = "voxy-platform-windows"
+description = "Windows-specific platform implementation"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+voxy-platform-core = { path = "../platform_core" }
+voxy-shared = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }

@@ -1,0 +1,26 @@
+[package]
+name = "voxy-observability"
+description = "Tracing, diagnostics, profiling, crash reporting, latency tracking"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+voxy-shared = { workspace = true }
+voxy-config = { workspace = true }
+voxy-event-bus = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+thiserror = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sysinfo = "0.33"
+dirs = "6"
+
+[dev-dependencies]
+tokio = { workspace = true }
+tempfile = "3"

@@ -1,0 +1,52 @@
+[package]
+name = "voxy-daemon"
+version = "0.1.0"
+edition = "2021"
+description = "VOXY background service daemon"
+
+[[bin]]
+name = "voxy-daemon"
+path = "src/main.rs"
+
+[features]
+default = []
+whisper-engine = ["voxy-whisper/whisper-engine"]
+piper-engine = ["voxy-kokoro/piper-engine"]
+
+[dependencies]
+voxy-shared = { path = "../../crates/shared" }
+voxy-config = { path = "../../crates/config" }
+voxy-logging = { path = "../../crates/logging" }
+voxy-metrics = { path = "../../crates/metrics" }
+voxy-event-bus = { path = "../../crates/event_bus" }
+voxy-kernel = { path = "../../crates/kernel" }
+voxy-voice = { path = "../../crates/voice" }
+voxy-whisper = { path = "../../crates/whisper" }
+voxy-kokoro = { path = "../../crates/kokoro" }
+voxy-orchestrator = { path = "../../crates/orchestrator" }
+voxy-cognition = { path = "../../crates/cognition" }
+voxy-automation = { path = "../../crates/automation" }
+voxy-model-router = { path = "../../crates/model_router" }
+voxy-provider-core = { path = "../../crates/provider_core" }
+voxy-audio = { path = "../../crates/audio" }
+voxy-voice-orchestrator = { path = "../../crates/voice_orchestrator" }
+voxy-world-model = { path = "../../crates/world_model" }
+voxy-memory = { path = "../../crates/memory" }
+voxy-companion-intelligence = { path = "../../crates/companion_intelligence" }
+voxy-cognitive-orchestrator = { path = "../../crates/cognitive_orchestrator" }
+voxy-runtime-guard = { path = "../../crates/runtime_guard" }
+voxy-health = { path = "../../crates/health" }
+voxy-security = { path = "../../crates/security" }
+voxy-ollama = { path = "../../crates/ollama" }
+voxy-desktop-runtime = { path = "../../crates/desktop_runtime" }
+tokio = { version = "1", features = ["full"] }
+tracing = "0.1"
+tracing-subscriber = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+num_cpus = { workspace = true }
+reqwest = { workspace = true }
+sysinfo = "0.33"
+serde = { workspace = true }
+serde_json = { workspace = true }
+futures-util = { workspace = true }

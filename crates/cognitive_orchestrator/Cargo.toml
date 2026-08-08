@@ -1,0 +1,26 @@
+[package]
+name = "voxy-cognitive-orchestrator"
+description = "Cognitive Orchestrator — central brain, reflection, experience replay, knowledge validation, skill discovery, workflow learning, goals, curiosity, and planning"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+voxy-shared = { path = "../shared" }
+voxy-companion-intelligence = { path = "../companion_intelligence" }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+thiserror = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+uuid = { workspace = true }
+chrono = { workspace = true }
+tracing = { workspace = true }
+parking_lot = { workspace = true }
+hashbrown = "0.15"
+num_cpus = { workspace = true }
+hostname = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }

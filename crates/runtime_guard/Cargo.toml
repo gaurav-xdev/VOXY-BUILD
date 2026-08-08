@@ -1,0 +1,23 @@
+[package]
+name = "voxy-runtime-guard"
+description = "Runtime health monitor, self-healing, watchdog, and dashboard for VOXY"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+voxy-shared = { workspace = true }
+voxy-health = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+chrono = { workspace = true }
+parking_lot = { workspace = true }
+sysinfo = "0.33"
+num_cpus = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }

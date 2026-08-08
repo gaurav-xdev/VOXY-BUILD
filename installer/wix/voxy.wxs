@@ -1,0 +1,162 @@
+<?xml version="1.0" encoding="windows-1252"?>
+<!--
+    VOXY MSI Installer — WiX v3 Configuration
+    Build: cargo wix (requires cargo-wix crate)
+    Or: candle.exe voxy.wxs && light.exe -out voxy.msi voxy.wixobj
+-->
+<Wix xmlns="http://schemas.microsoft.com/wix/2006/wi">
+
+  <Product
+    Id="*"
+    Name="VOXY"
+    Language="1033"
+    Version="!(bind.FileVersion.voxy-daemon.exe)"
+    Manufacturer="VOXY Engineering Team"
+    UpgradeCode="A1B2C3D4-E5F6-7890-ABCD-EF1234567890">
+
+    <Package
+      InstallerVersion="200"
+      Compressed="yes"
+      InstallScope="perMachine"
+      Description="VOXY — Autonomous AI Operating System"
+      Manufacturer="VOXY Engineering Team"
+      Comments="Voice-first autonomous AI operating system" />
+
+    <MajorUpgrade
+      DowngradeErrorMessage="A newer version of VOXY is already installed." />
+
+    <Media Id="1" Cabinet="voxy.cab" EmbedCab="yes" DiskPrompt="CD-ROM #1" />
+    <Property Id="DiskPrompt" Value="VOXY Installation" />
+
+    <Icon Id="VoxyIcon.exe" SourceFile="!(bind.Path.voxy-daemon.exe)" />
+    <Property Id="ARPPRODUCTICON" Value="VoxyIcon.exe" />
+    <Property Id="ARPHELPLINK" Value="https://github.com/voxy-ai/voxy" />
+    <Property Id="ARPURLINFOABOUT" Value="https://github.com/voxy-ai/voxy" />
+
+    <Feature
+      Id="MainProgram"
+      Title="VOXY Application"
+      Description="Installs the VOXY daemon and overlay."
+      Level="1"
+      ConfigurableDirectory="INSTALLDIR"
+      AllowAdvertise="no"
+      Display="hidden">
+      <ComponentRef Id="DaemonComponent" />
+      <ComponentRef Id="OverlayComponent" />
+      <ComponentRef Id="ConfigDirComponent" />
+      <ComponentRef Id="LogsDirComponent" />
+      <ComponentRef Id="StartMenuShortcuts" />
+      <ComponentRef Id="EnvironmentPath" />
+    </Feature>
+
+    <Feature
+      Id="DesktopShortcut"
+      Title="Desktop Shortcut"
+      Description="Creates a desktop shortcut for VOXY."
+      Level="1"
+      AllowAdvertise="no"
+      Absent="allow">
+      <ComponentRef Id="DesktopShortcutComponent" />
+    </Feature>
+
+    <Directory Id="TARGETDIR" Name="SourceDir">
+      <Directory Id="ProgramFilesFolder">
+        <Directory Id="INSTALLDIR" Name="VOXY">
+          <Component Id="DaemonComponent" Guid="*">
+            <File
+              Id="voxy-daemon.exe"
+              Name="voxy-daemon.exe"
+              DiskId="1"
+              Source="!(bind.Path.voxy-daemon.exe)"
+              KeyPath="yes" />
+          </Component>
+          <Component Id="OverlayComponent" Guid="*">
+            <File
+              Id="voxy-overlay.exe"
+              Name="voxy-overlay.exe"
+              DiskId="1"
+              Source="!(bind.Path.voxy-overlay.exe)"
+              KeyPath="yes" />
+          </Component>
+          <Component Id="ConfigDirComponent" Guid="*">
+            <CreateFolder Directory="ConfigDir" />
+            <Environment
+              Id="PATH"
+              Name="PATH"
+              Value="[INSTALLDIR]"
+              Permanent="no"
+              Part="last"
+              Action="set"
+              System="yes" />
+          </Component>
+          <Component Id="LogsDirComponent" Guid="*">
+            <CreateFolder Directory="LogsDir" />
+          </Component>
+        </Directory>
+      </Directory>
+      <Directory Id="ProgramMenuFolder">
+        <Directory Id="ApplicationProgramsFolder" Name="VOXY">
+          <Component Id="StartMenuShortcuts" Guid="*">
+            <Shortcut
+              Id="DaemonStartMenuShortcut"
+              Name="VOXY Daemon"
+              Description="Start VOXY daemon"
+              Target="[INSTALLDIR]voxy-daemon.exe"
+              WorkingDirectory="INSTALLDIR" />
+            <Shortcut
+              Id="UninstallShortcut"
+              Name="Uninstall VOXY"
+              Description="Uninstall VOXY"
+              Target="[System64Folder]msiexec.exe"
+              Arguments="/x [ProductCode]" />
+            <RemoveFolder
+              Id="CleanupShortcuts"
+              Directory="ApplicationProgramsFolder"
+              On="uninstall" />
+            <RegistryValue
+              Root="HKCU"
+              Key="Software\VOXY\Shortcuts"
+              Name="StartMenu"
+              Type="integer"
+              Value="1"
+              KeyPath="yes" />
+          </Component>
+        </Directory>
+      </Directory>
+      <Directory Id="DesktopFolder">
+        <Component Id="DesktopShortcutComponent" Guid="*">
+          <Shortcut
+            Id="DesktopShortcut"
+            Name="VOXY"
+            Description="Start VOXY daemon"
+            Target="[INSTALLDIR]voxy-daemon.exe"
+            WorkingDirectory="INSTALLDIR" />
+          <RegistryValue
+            Root="HKCU"
+            Key="Software\VOXY\Shortcuts"
+            Name="Desktop"
+            Type="integer"
+            Value="1"
+            KeyPath="yes" />
+        </Component>
+      </Directory>
+    </Directory>
+
+    <Directory Id="ConfigDir" Name="config" />
+    <Directory Id="LogsDir" Name="logs" />
+
+    <SetProperty Id="ARPINSTALLLOCATION" Value="[INSTALLDIR]" After="CostFinalize" />
+
+    <Icon Id="VoxyIcon.ico" SourceFile="$(sys.CURRENTDIR)assets\icons\voxy.ico" />
+    <Property Id="ARPPRODUCTICON" Value="VoxyIcon.ico" />
+
+    <Property Id="WIX_UI_INSTALLDIR" Value="INSTALLDIR" />
+    <UIRef Id="WixUI_InstallDir" />
+    <UIRef Id="WixUI_ErrorDialog" />
+
+    <WixVariable Id="WixUILicenseRtf" Value="$(sys.CURRENTDIR)installer\license.rtf" />
+    <WixVariable Id="WixUIBannerBmp" Value="$(sys.CURRENTDIR)installer\banner.bmp" />
+    <WixVariable Id="WixUIDialogBmp" Value="$(sys.CURRENTDIR)installer\dialog.bmp" />
+
+  </Product>
+</Wix>

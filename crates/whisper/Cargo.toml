@@ -1,0 +1,28 @@
+[package]
+name = "voxy-whisper"
+description = "Whisper local STT provider (whisper.cpp via whisper-rs)"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[features]
+default = []
+whisper-engine = ["dep:whisper-rs"]
+
+[dependencies]
+voxy-shared = { workspace = true }
+voxy-config = { workspace = true }
+voxy-provider-core = { path = "../provider_core" }
+voxy-voice-orchestrator = { path = "../voice_orchestrator" }
+parking_lot = { workspace = true }
+chrono = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+thiserror = { workspace = true }
+serde = { workspace = true }
+tracing = { workspace = true }
+whisper-rs = { version = "0.16", optional = true, features = ["openmp"] }
+
+[dev-dependencies]
+tokio = { workspace = true }

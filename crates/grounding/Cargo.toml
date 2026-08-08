@@ -1,0 +1,23 @@
+﻿[package]
+name = "voxy-grounding"
+description = "Abstract intention to concrete UI target translation"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+voxy-shared = { workspace = true }
+voxy-config = { workspace = true }
+voxy-event-bus = { workspace = true }
+voxy-vision = { path = "../vision" }
+voxy-automation = { path = "../automation" }
+voxy-world-model = { path = "../world_model" }
+voxy-orchestrator = { path = "../orchestrator" }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }

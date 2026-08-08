@@ -1,0 +1,16 @@
+[package]
+name = "voxy-resource-governor"
+description = "Resource budgets: CPU, memory, concurrency, timeouts, cancellation"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+voxy-shared = { workspace = true }
+tokio = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+
+[dev-dependencies]
+tokio = { workspace = true }
