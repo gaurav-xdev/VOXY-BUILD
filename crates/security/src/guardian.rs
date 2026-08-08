@@ -3,6 +3,7 @@ use crate::capability::{CapabilityRegistry, RiskLevel};
 use crate::consent::ConsentManager;
 use crate::integrity::IntegrityVerifier;
 use crate::policy::{AuditLevel, PolicyEngine, PolicyInput, PolicyResult};
+use crate::recovery::RecoveryMode;
 use crate::rollback::RollbackManager;
 use crate::threat::{ThreatDetector, ThreatSeverity};
 use crate::trust::TrustManager;
@@ -90,6 +91,7 @@ impl GuardianEngine {
         resource: Option<&str>,
         action: &str,
         context: std::collections::HashMap<String, String>,
+        recovery: &RecoveryMode,
     ) -> GuardianDecision {
         let execution_id = Uuid::new_v4();
         let mut audit_log = self.audit_log.lock().unwrap_or_else(|e| e.into_inner());
@@ -183,6 +185,102 @@ impl GuardianEngine {
                 };
             }
             timestamps.push(now_ms);
+        }
+
+        // SECURITY: Recovery mode enforcement — when recovery mode is active,
+        // critical-risk actions are denied to prevent further compromise.
+        // Medium and high risk actions are also restricted to limit attack surface.
+        if recovery.is_active() && risk_level >= RiskLevel::Medium {
+            let restriction_level = if risk_level >= RiskLevel::Critical {
+                "critical"
+            } else {
+                "medium+"
+            };
+            audit_log.record(
+                subject,
+                action,
+                resource,
+                "denied",
+                Some(&format!(
+                    "Recovery mode active — {} risk actions restricted",
+                    restriction_level
+                )),
+                &format!("{risk_level:?}"),
+                &format!("{trust_level:?}"),
+                AuditLevel::Full,
+            );
+            return GuardianDecision {
+                allowed: false,
+                requires_consent: false,
+                requires_mfa: false,
+                audit_level: AuditLevel::Full,
+                reason: format!(
+                    "Recovery mode active — {} risk actions are restricted",
+                    restriction_level
+                ),
+                policy_result: None,
+                execution_id,
+            };
+        }
+
+        // SECURITY: Integrity check — if enabled and entries are registered, verify
+        // resource integrity before allowing Critical-risk actions. This prevents
+        // authorization of actions against tampered resources.
+        if self.config.require_integrity_check
+            && risk_level >= RiskLevel::Critical
+            && !self.integrity_verifier.is_empty()
+        {
+            if let Some(res) = resource {
+                if self.integrity_verifier.get_entry(res).is_some() {
+                    if let Some(data_str) = context.get("integrity_data") {
+                        if !self.integrity_verifier.verify(res, data_str.as_bytes()) {
+                            audit_log.record(
+                                subject,
+                                action,
+                                Some(res),
+                                "denied",
+                                Some("Integrity check failed"),
+                                &format!("{risk_level:?}"),
+                                &format!("{trust_level:?}"),
+                                AuditLevel::Full,
+                            );
+                            return GuardianDecision {
+                                allowed: false,
+                                requires_consent: false,
+                                requires_mfa: false,
+                                audit_level: AuditLevel::Full,
+                                reason: format!(
+                                    "Integrity check failed for resource '{res}'"
+                                ),
+                                policy_result: None,
+                                execution_id,
+                            };
+                        }
+                    } else {
+                        audit_log.record(
+                            subject,
+                            action,
+                            Some(res),
+                            "denied",
+                            Some("Integrity data required but not provided"),
+                            &format!("{risk_level:?}"),
+                            &format!("{trust_level:?}"),
+                            AuditLevel::Full,
+                        );
+                        return GuardianDecision {
+                            allowed: false,
+                            requires_consent: false,
+                            requires_mfa: false,
+                            audit_level: AuditLevel::Full,
+                            reason: format!(
+                                "Resource '{res}' requires integrity data for Critical-risk authorization"
+                            ),
+                            policy_result: None,
+                            execution_id,
+                        };
+                    }
+                }
+            }
         }
 
         let policy_input = PolicyInput {
@@ -399,6 +497,11 @@ impl GuardianEngine {
 mod tests {
     use super::*;
     use crate::capability::{Capability, CapabilityCategory};
+    use crate::recovery::RecoveryMode;
+
+    fn normal_recovery() -> RecoveryMode {
+        RecoveryMode::new()
+    }
 
     fn make_engine() -> GuardianEngine {
         let mut registry = CapabilityRegistry::new();
@@ -446,9 +549,8 @@ mod tests {
             priority: 50,
         });
 
-        let engine = GuardianEngine::new(registry, policy, GuardianConfig::default())
-            .with_trust_manager(trust);
-        engine
+        GuardianEngine::new(registry, policy, GuardianConfig::default())
+            .with_trust_manager(trust)
     }
 
     #[test]
@@ -460,6 +562,7 @@ mod tests {
             None,
             "read",
             std::collections::HashMap::new(),
+            &normal_recovery(),
         );
         assert!(decision.allowed);
     }
@@ -473,6 +576,7 @@ mod tests {
             None,
             "write",
             std::collections::HashMap::new(),
+            &normal_recovery(),
         );
         assert!(decision.requires_consent || decision.allowed);
     }
@@ -486,6 +590,7 @@ mod tests {
             None,
             "execute",
             std::collections::HashMap::new(),
+            &normal_recovery(),
         );
         assert!(!decision.allowed);
     }
@@ -506,6 +611,7 @@ mod tests {
             None,
             "read",
             std::collections::HashMap::new(),
+            &normal_recovery(),
         );
         assert!(!decision.allowed);
     }
@@ -519,6 +625,7 @@ mod tests {
             None,
             "delete",
             std::collections::HashMap::new(),
+            &normal_recovery(),
         );
         assert!(decision.requires_mfa || decision.allowed);
     }
@@ -532,6 +639,7 @@ mod tests {
             None,
             "read",
             std::collections::HashMap::new(),
+            &normal_recovery(),
         );
         let d2 = engine.evaluate(
             "user-1",
@@ -539,7 +647,191 @@ mod tests {
             None,
             "read",
             std::collections::HashMap::new(),
+            &normal_recovery(),
         );
         assert_ne!(d1.execution_id, d2.execution_id);
+    }
+
+    #[test]
+    fn guardian_integrity_check_blocks_critical_without_data() {
+        let mut registry = CapabilityRegistry::new();
+        let _ = registry.register(Capability::new(
+            "test:critical",
+            "Critical Risk",
+            RiskLevel::Critical,
+            CapabilityCategory::System,
+        ));
+        let mut verifier = IntegrityVerifier::new();
+        verifier.register("/important/resource", b"expected-data");
+        // Use a permissive policy so the integrity check is reached
+        let mut policy = PolicyEngine::new();
+        policy.add_rule(crate::policy::PolicyRule {
+            id: "allow-critical".to_string(),
+            description: "Allow critical for test".to_string(),
+            effect: crate::policy::PolicyEffect::Allow,
+            capabilities: vec!["test:critical".to_string()],
+            conditions: vec![crate::policy::PolicyCondition::TrustLevelAtLeast(
+                "unknown".to_string(),
+            )],
+            priority: 100,
+        });
+        let engine = GuardianEngine {
+            capability_registry: registry,
+            policy_engine: policy,
+            consent_manager: Mutex::new(ConsentManager::new()),
+            trust_manager: Mutex::new(TrustManager::new()),
+            threat_detector: Mutex::new(ThreatDetector::new()),
+            integrity_verifier: verifier,
+            audit_log: Mutex::new(AuditLog::new()),
+            rollback_manager: Mutex::new(RollbackManager::new()),
+            config: GuardianConfig {
+                require_integrity_check: true,
+                ..Default::default()
+            },
+            rate_limiter: Mutex::new(HashMap::new()),
+        };
+        let decision = engine.evaluate(
+            "user-1",
+            "test:critical",
+            Some("/important/resource"),
+            "delete",
+            std::collections::HashMap::new(),
+            &normal_recovery(),
+        );
+        assert!(!decision.allowed);
+        assert!(
+            decision.reason.contains("integrity data"),
+            "Expected 'integrity data' in reason, got: {}",
+            decision.reason
+        );
+    }
+
+    #[test]
+    fn guardian_integrity_check_blocks_tampered_resource() {
+        let mut registry = CapabilityRegistry::new();
+        let _ = registry.register(Capability::new(
+            "test:critical",
+            "Critical Risk",
+            RiskLevel::Critical,
+            CapabilityCategory::System,
+        ));
+        let mut verifier = IntegrityVerifier::new();
+        verifier.register("/important/resource", b"expected-data");
+        let mut policy = PolicyEngine::new();
+        policy.add_rule(crate::policy::PolicyRule {
+            id: "allow-critical".to_string(),
+            description: "Allow critical for test".to_string(),
+            effect: crate::policy::PolicyEffect::Allow,
+            capabilities: vec!["test:critical".to_string()],
+            conditions: vec![crate::policy::PolicyCondition::TrustLevelAtLeast(
+                "unknown".to_string(),
+            )],
+            priority: 100,
+        });
+        let engine = GuardianEngine {
+            capability_registry: registry,
+            policy_engine: policy,
+            consent_manager: Mutex::new(ConsentManager::new()),
+            trust_manager: Mutex::new(TrustManager::new()),
+            threat_detector: Mutex::new(ThreatDetector::new()),
+            integrity_verifier: verifier,
+            audit_log: Mutex::new(AuditLog::new()),
+            rollback_manager: Mutex::new(RollbackManager::new()),
+            config: GuardianConfig {
+                require_integrity_check: true,
+                ..Default::default()
+            },
+            rate_limiter: Mutex::new(HashMap::new()),
+        };
+        let mut ctx = std::collections::HashMap::new();
+        ctx.insert("integrity_data".to_string(), "tampered-data".to_string());
+        let decision = engine.evaluate(
+            "user-1",
+            "test:critical",
+            Some("/important/resource"),
+            "delete",
+            ctx,
+            &normal_recovery(),
+        );
+        assert!(!decision.allowed);
+        assert!(decision.reason.contains("Integrity check failed"));
+    }
+
+    #[test]
+    fn guardian_denies_critical_when_recovery_active() {
+        let engine = make_engine();
+        let mut recovery = RecoveryMode::new();
+        recovery.enter(crate::recovery::RecoveryAuth {
+            subject: "system".to_string(),
+            reason: "Compromise detected".to_string(),
+            auth_method: "automatic".to_string(),
+        })
+        .unwrap();
+
+        let decision = engine.evaluate(
+            "user-1",
+            "test:critical",
+            None,
+            "delete",
+            std::collections::HashMap::new(),
+            &recovery,
+        );
+        assert!(!decision.allowed);
+        assert!(decision.reason.contains("Recovery mode active"));
+    }
+
+    #[test]
+    fn guardian_denies_medium_when_recovery_active() {
+        let mut recovery = RecoveryMode::new();
+        recovery.enter(crate::recovery::RecoveryAuth {
+            subject: "system".to_string(),
+            reason: "Compromise detected".to_string(),
+            auth_method: "automatic".to_string(),
+        })
+        .unwrap();
+
+        // Register a medium-risk capability
+        let mut registry = CapabilityRegistry::new();
+        let _ = registry.register(Capability::new(
+            "test:medium",
+            "Medium Risk",
+            RiskLevel::Medium,
+            CapabilityCategory::System,
+        ));
+        let policy = PolicyEngine::new();
+        let engine = GuardianEngine::new(registry, policy, GuardianConfig::default());
+
+        let decision = engine.evaluate(
+            "user-1",
+            "test:medium",
+            None,
+            "write",
+            std::collections::HashMap::new(),
+            &recovery,
+        );
+        assert!(!decision.allowed);
+        assert!(decision.reason.contains("Recovery mode active"));
+    }
+
+    #[test]
+    fn guardian_allows_low_risk_during_recovery() {
+        let engine = make_engine();
+        let mut recovery = RecoveryMode::new();
+        recovery.enter(crate::recovery::RecoveryAuth {
+            subject: "system".to_string(),
+            reason: "Compromise detected".to_string(),
+            auth_method: "automatic".to_string(),
+        })
+        .unwrap();
+
+        let decision = engine.evaluate(
+            "user-1",
+            "test:low",
+            None,
+            "read",
+            std::collections::HashMap::new(),
+            &recovery,
+        );
+        assert!(decision.allowed, "Low risk should be allowed during recovery");
     }
 }

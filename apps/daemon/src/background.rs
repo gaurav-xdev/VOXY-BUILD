@@ -9,6 +9,7 @@ use tracing::{error, info, warn};
 use voxy_cognitive_orchestrator::bridge::CognitiveBridge;
 use voxy_cognitive_orchestrator::knowledge_validation::KnowledgeItem;
 use voxy_cognitive_orchestrator::reflection::ConversationRecord;
+use voxy_runtime_guard::RuntimeGuard;
 
 use crate::VoiceMetrics;
 
@@ -63,6 +64,7 @@ impl BackgroundRuntime {
         running: Arc<AtomicBool>,
         _metrics: Arc<VoiceMetrics>,
         cognitive: Arc<CognitiveBridge>,
+        guard: Arc<RuntimeGuard>,
     ) -> (Self, ReflectionSubmitter, KnowledgeValidationSubmitter) {
         let (shutdown_tx, _) = broadcast::channel(16);
         let (reflection_tx, reflection_rx) = mpsc::channel(256);
@@ -145,9 +147,10 @@ impl BackgroundRuntime {
         {
             let running = running.clone();
             let cognitive = cognitive.clone();
+            let guard = guard.clone();
             let mut shutdown_rx = shutdown_tx.subscribe();
             handles.push(tokio::spawn(async move {
-                health_monitor_task(running, cognitive, &mut shutdown_rx).await;
+                health_monitor_task(running, cognitive, guard, &mut shutdown_rx).await;
             }));
         }
 
@@ -459,16 +462,58 @@ async fn workflow_learning_task(
 async fn health_monitor_task(
     running: Arc<AtomicBool>,
     _cognitive: Arc<CognitiveBridge>,
+    guard: Arc<RuntimeGuard>,
     shutdown_rx: &mut broadcast::Receiver<()>,
 ) {
     let mut interval = tokio::time::interval(Duration::from_secs(30));
+    let mut consecutive_failures = 0u32;
+    let ollama_url = std::env::var("VOXY_OLLAMA_URL")
+        .unwrap_or_else(|_| "http://127.0.0.1:11434".to_string());
+
     loop {
         tokio::select! {
             _ = interval.tick() => {
                 if !running.load(Ordering::Relaxed) {
                     break;
                 }
-                tracing::debug!("Health monitor tick — checking subsystem status");
+
+                // Check Ollama LLM provider health
+                let url = format!("{}/api/tags", ollama_url);
+                match reqwest::Client::new()
+                    .get(&url)
+                    .timeout(Duration::from_secs(5))
+                    .send()
+                    .await
+                {
+                    Ok(resp) if resp.status().is_success() => {
+                        consecutive_failures = 0;
+                    }
+                    Ok(resp) => {
+                        consecutive_failures += 1;
+                        warn!(
+                            status = %resp.status(),
+                            failures = consecutive_failures,
+                            "Ollama health check returned non-success"
+                        );
+                    }
+                    Err(e) => {
+                        consecutive_failures += 1;
+                        warn!(
+                            error = %e,
+                            failures = consecutive_failures,
+                            "Ollama health check failed"
+                        );
+                        if consecutive_failures >= 3 {
+                            error!(
+                                "Ollama unreachable for {} consecutive checks. Triggering self-healing.",
+                                consecutive_failures
+                            );
+                            // Send a heartbeat to trigger RuntimeGuard's self-healing mechanism
+                            guard.heartbeat("ollama_llm");
+                            consecutive_failures = 0;
+                        }
+                    }
+                }
             }
             _ = shutdown_rx.recv() => {
                 info!("Health monitor shutting down");

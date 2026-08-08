@@ -519,6 +519,7 @@ fn run_pipeline(running: Arc<AtomicBool>, metrics: Arc<VoiceMetrics>) -> Pipelin
                 running.clone(),
                 metrics.clone(),
                 cognitive_bridge.clone(),
+                guard.clone(),
             );
         tracing::info!("Background runtime started (9 tasks)");
 
@@ -594,6 +595,72 @@ fn run_pipeline(running: Arc<AtomicBool>, metrics: Arc<VoiceMetrics>) -> Pipelin
             Err(e) => tracing::warn!("Ollama not reachable: {e} — LLM responses will be fallbacks"),
         }
 
+        // Register Ollama LLM as a healable subsystem
+        {
+            let ollama_url_clone = ollama_url.clone();
+            let g = guard.clone();
+            g.register_healable(
+                "ollama_llm",
+                move || {
+                    let url = format!("{}/api/tags", ollama_url_clone);
+                    async move {
+                        match reqwest::Client::new()
+                            .get(&url)
+                            .timeout(Duration::from_secs(5))
+                            .send()
+                            .await
+                        {
+                            Ok(resp) if resp.status().is_success() => {
+                                voxy_health::HealthReport::new(
+                                    "ollama_llm",
+                                    voxy_shared::HealthStatus::Healthy,
+                                )
+                            }
+                            Ok(resp) => voxy_health::HealthReport::new(
+                                "ollama_llm",
+                                voxy_shared::HealthStatus::Degraded(format!("HTTP {}", resp.status())),
+                            ),
+                            Err(e) => voxy_health::HealthReport::new(
+                                "ollama_llm",
+                                voxy_shared::HealthStatus::Unhealthy(format!("{}", e)),
+                            ),
+                        }
+                    }
+                },
+                move || {
+                    let url = format!("{}/api/tags", ollama_url);
+                    async move {
+                        // Wait briefly for Ollama to potentially recover
+                        tokio::time::sleep(Duration::from_secs(2)).await;
+                        // Verify Ollama is actually healthy before declaring recovery
+                        match reqwest::Client::new()
+                            .get(&url)
+                            .timeout(Duration::from_secs(5))
+                            .send()
+                            .await
+                        {
+                            Ok(resp) if resp.status().is_success() => {
+                                tracing::info!("Ollama recovery verified — health check passed");
+                                Ok(())
+                            }
+                            Ok(resp) => {
+                                let msg = format!("Ollama returned HTTP {}", resp.status());
+                                tracing::warn!("Ollama recovery failed: {}", msg);
+                                Err(msg)
+                            }
+                            Err(e) => {
+                                tracing::warn!("Ollama recovery failed: {}", e);
+                                Err(format!("{}", e))
+                            }
+                        }
+                    }
+                },
+            )
+            .await;
+            guard.heartbeat("ollama_llm");
+            tracing::info!("Runtime Guard: 5 subsystems registered (1 healable)");
+        }
+
         // ── Cognitive Engine (intent matching) ────────────────────────────
         let cognitive = Arc::new(InMemoryCognitiveEngine::new(CognitionConfig::default()));
 
@@ -601,7 +668,7 @@ fn run_pipeline(running: Arc<AtomicBool>, metrics: Arc<VoiceMetrics>) -> Pipelin
         let audit_log = Arc::new(tokio::sync::Mutex::new(AuditLog::new()));
         let guardian = Arc::new(GuardianEngine::new(
             CapabilityRegistry::new(),
-            PolicyEngine::new(),
+            PolicyEngine::with_default_rules(),
             GuardianConfig::default(),
         ));
 
@@ -657,6 +724,7 @@ fn run_pipeline(running: Arc<AtomicBool>, metrics: Arc<VoiceMetrics>) -> Pipelin
             let sys_prompt = system_prompt.clone();
             let tasks_completed = tasks_completed.clone();
             let audit_log = audit_log.clone();
+            let recovery_mode = recovery_mode.clone();
             Box::new(
                 move |text: String| -> Pin<Box<dyn std::future::Future<Output = String> + Send>> {
                     let cognitive = cognitive.clone();
@@ -668,6 +736,7 @@ fn run_pipeline(running: Arc<AtomicBool>, metrics: Arc<VoiceMetrics>) -> Pipelin
                     let reflector = reflector.clone();
                     let guardian = guardian.clone();
                     let sys_prompt = sys_prompt.clone();
+                    let recovery_mode = recovery_mode.clone();
                     let tasks_completed = tasks_completed.clone();
                     let audit_log = audit_log.clone();
                     Box::pin(async move {
@@ -725,13 +794,17 @@ fn run_pipeline(running: Arc<AtomicBool>, metrics: Arc<VoiceMetrics>) -> Pipelin
                             };
 
                             // ── GUARDIAN CHECK: automation requires authorization ──
-                            let decision = guardian.evaluate(
-                                "voice-user",
-                                "automation:write",
-                                Some(app),
-                                "launch_application",
-                                std::collections::HashMap::new(),
-                            );
+                            let decision = {
+                                let r = recovery_mode.lock().await;
+                                guardian.evaluate(
+                                    "voice-user",
+                                    "automation:write",
+                                    Some(app),
+                                    "launch_application",
+                                    std::collections::HashMap::new(),
+                                    &r,
+                                )
+                            };
 
                             // Record typed audit event for guardian decision
                             {
@@ -759,6 +832,32 @@ fn run_pipeline(running: Arc<AtomicBool>, metrics: Arc<VoiceMetrics>) -> Pipelin
                             }
 
                             if !decision.allowed {
+                                // Activate recovery mode on critical-risk denials
+                                if decision.requires_mfa {
+                                    let mut recovery = recovery_mode.lock().await;
+                                    if recovery.state() == voxy_security::recovery::RecoveryState::Normal {
+                                        let auth = voxy_security::recovery::RecoveryAuth {
+                                            subject: "system".to_string(),
+                                            reason: format!(
+                                                "Critical risk action denied: {}",
+                                                decision.reason
+                                            ),
+                                            auth_method: "automatic_guardian".to_string(),
+                                        };
+                                        if let Err(e) = recovery.enter(auth) {
+                                            tracing::error!(
+                                                error = %e,
+                                                "Failed to activate recovery mode"
+                                            );
+                                        } else {
+                                            tracing::warn!(
+                                                reason = %decision.reason,
+                                                "Recovery mode activated due to critical threat"
+                                            );
+                                        }
+                                    }
+                                }
+
                                 let response = format!(
                                     "I need permission to open {}. {}",
                                     app, decision.reason
