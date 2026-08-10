@@ -394,17 +394,17 @@ fn run_pipeline(running: Arc<AtomicBool>, metrics: Arc<VoiceMetrics>) -> Pipelin
 
         #[cfg(feature = "whisper-engine")]
         {
-            tracing::info!("[DIAG:STT] Loading Whisper model from models/ggml-base.en.bin...");
+            tracing::info!("[VOICE:STT] Loading Whisper model from models/ggml-base.en.bin...");
             let whisper = voxy_whisper::WhisperSttEngine::new()
                 .with_model_path("models/ggml-base.en.bin".into());
             match whisper.load_model() {
                 Ok(()) => {
-                    tracing::info!("[DIAG:STT] Whisper model loaded successfully");
+                    tracing::info!("[VOICE:STT] Whisper model loaded");
                     pipeline.set_stt_engine(Box::new(whisper)).await?;
                 }
                 Err(e) => {
-                    tracing::error!("[DIAG:STT] Failed to load whisper model: {e}");
-                    tracing::warn!("[DIAG:STT] STT will return empty — whisper model failed to load");
+                    tracing::error!("[VOICE:STT] Whisper load failed: {e}");
+                    tracing::warn!("[VOICE:STT] STT will return empty — whisper model failed to load");
                     pipeline.set_stt_engine(Box::new(voxy_whisper::WhisperSttEngine::new())).await?;
                 }
             }
@@ -425,8 +425,8 @@ fn run_pipeline(running: Arc<AtomicBool>, metrics: Arc<VoiceMetrics>) -> Pipelin
                 .with_pitch(1.0)
                 .with_model_path("models/en_US-lessac-medium.onnx".into());
             match tts.load_model() {
-                Ok(()) => tracing::info!("Piper TTS model loaded"),
-                Err(e) => tracing::error!("Failed to load piper model: {e}"),
+                Ok(()) => tracing::info!("[VOICE:TTS] Piper model loaded"),
+                Err(e) => tracing::error!("[VOICE:TTS] Piper load failed: {e}"),
             }
             pipeline.set_tts_engine(Box::new(tts)).await?;
         }
@@ -764,7 +764,7 @@ fn run_pipeline(running: Arc<AtomicBool>, metrics: Arc<VoiceMetrics>) -> Pipelin
                         let response_start = Instant::now();
 
                         // ── 1. Feed transcript → Experience Layer ──────────
-                        tracing::info!("[DIAG:STT] Transcribed text: {}", text);
+                        tracing::info!("[VOICE:LLM] Text: {}", text);
                         let _ = exp_input.send(ExperienceInput::VoiceTranscript {
                             text: text.clone(),
                             is_final: true,
@@ -944,7 +944,7 @@ fn run_pipeline(running: Arc<AtomicBool>, metrics: Arc<VoiceMetrics>) -> Pipelin
                         );
 
                         // ── 5. Generate response via Ollama LLM ───────────
-                        tracing::info!("[DIAG:LLM] Calling Ollama with prompt length={}", system_prompt.len());
+                        tracing::info!("[VOICE:LLM] Calling Ollama (prompt={} chars)", system_prompt.len());
                         let response = match llm
                             .complete(&format!(
                                 "{system_prompt}\n\n{}",
@@ -984,7 +984,7 @@ fn run_pipeline(running: Arc<AtomicBool>, metrics: Arc<VoiceMetrics>) -> Pipelin
                         };
 
                         let elapsed_ms = response_start.elapsed().as_millis();
-                        tracing::info!("[DIAG:LLM] Response generated: {} chars in {}ms", response.len(), elapsed_ms);
+                        tracing::info!("[VOICE:LLM] Response: {} chars in {}ms", response.len(), elapsed_ms);
                         tracing::info!(
                             input = %text,
                             response_len = response.len(),

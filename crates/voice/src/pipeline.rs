@@ -602,7 +602,7 @@ impl VoicePipeline {
                 };
 
                 diagnostics.record_packet_captured(&packet).await;
-                tracing::debug!("[DIAG:MIC_CAPTURE] Captured {} samples at {}Hz", packet.data.len(), packet.sample_rate);
+                tracing::debug!("[VOICE:MIC] Captured {} samples at {}Hz", packet.data.len(), packet.sample_rate);
                 if let Some(ref w) = watchdog {
                     w.heartbeat("audio_input");
                 }
@@ -738,6 +738,9 @@ impl VoicePipeline {
                     }
                 } else if !is_voice {
                     voice_frames_during_tts = 0;
+                    if is_awake {
+                        silence_frames_after_speech += 1;
+                    }
                 }
 
                 // ── End-of-utterance → STT → LLM → TTS ──────────────
@@ -774,7 +777,7 @@ impl VoicePipeline {
                         };
 
                         let stt_latency = stt_start.elapsed().as_millis() as f64;
-                        tracing::info!("[DIAG:STT] Transcription result: '{}' ({}ms)", text, stt_latency);
+                        tracing::info!("[VOICE:STT] '{}' ({}ms)", text, stt_latency);
                         {
                             let mut m = streaming_metrics.write().await;
                             m.stt_latency_ms = stt_latency;
@@ -806,7 +809,7 @@ impl VoicePipeline {
                                 None => String::new(),
                             };
                             let llm_latency = llm_start.elapsed().as_millis() as f64;
-                            tracing::info!("[DIAG:LLM] Response received: {} chars ({}ms)", response.len(), llm_latency);
+                            tracing::info!("[VOICE:LLM] Response: {} chars ({}ms)", response.len(), llm_latency);
 
                             if !response.is_empty() {
                                 *last_activity.write().await = Instant::now();
@@ -854,15 +857,15 @@ impl VoicePipeline {
                                             tracing::info!("TTS interrupted");
                                         }
                                         _ = async {
-                                            tracing::info!("[DIAG:TTS] Starting synthesis for: '{}'", response);
+                                            tracing::info!("[VOICE:TTS] Synthesizing: '{}'", response);
                                             if let Some(ref handler) = *event_handler_clone.read().await {
                                                 handler(VoiceEvent::SynthesisStarted { text: response.clone() });
                                             }
                                             let tts_guard = tts_engine_clone.read().await;
                                             if let Some(ref tts) = *tts_guard {
-                                                tracing::info!("[DIAG:TTS] Engine available: {}", tts.name());
+                                                tracing::info!("[VOICE:TTS] Engine: {}", tts.name());
                                                 if let Ok(mut stream) = tts.synthesize_stream(&response).await {
-                                                    tracing::info!("[DIAG:TTS] Stream created, reading chunks...");
+                                                    tracing::info!("[VOICE:TTS] Stream ready, streaming chunks...");
                                                     let mut first_chunk = true;
                                                     let mut fade_samples_remaining =
                                                         (48000u32 * TTS_FADE_IN_MS / 1000) as usize;
@@ -895,6 +898,16 @@ impl VoicePipeline {
                                                             faded_data = VoicePipeline::resample_speed(&faded_data, speed);
                                                         }
 
+                                                        // Resample TTS output to match output device sample rate
+                                                        let tts_sr = chunk.sample_rate;
+                                                        let out_sr = {
+                                                            let out_guard = audio_output_clone.read().await;
+                                                            out_guard.as_ref().map_or(config.audio.output.sample_rate, |o| o.sample_rate())
+                                                        };
+                                                        if tts_sr != out_sr {
+                                                            faded_data = VoicePipeline::resample_rate(&faded_data, tts_sr, out_sr);
+                                                        }
+
                                                         // Write TTS output into AEC reference buffer
                                                         {
                                                             let mut ref_buf = tts_ref_for_write.lock();
@@ -908,9 +921,9 @@ impl VoicePipeline {
                                                         }
 
                                                         let pkt = voxy_audio::AudioPacket::new(
-                                                            faded_data, chunk.sample_rate, chunk.channels,
+                                                            faded_data, out_sr, config.audio.output.channels,
                                                         );
-                                                        tracing::debug!("[DIAG:AUDIO_OUTPUT] Writing {} samples to output", pkt.data.len());
+                                                        tracing::debug!("[VOICE:AUDIO_OUTPUT] Writing {} samples at {}Hz", pkt.data.len(), out_sr);
                                                         if let Some(ref mut output) = *audio_output_clone.write().await {
                                                             let _ = output.write(&pkt).await;
                                                         }
@@ -1273,6 +1286,15 @@ impl VoicePipeline {
                     faded_data = Self::resample_speed(&faded_data, speed);
                 }
 
+                // Resample TTS output to match output device sample rate
+                let out_sr = {
+                    let out_guard = self.audio_output.read().await;
+                    out_guard.as_ref().map_or(self.config.audio.output.sample_rate, |o| o.sample_rate())
+                };
+                if last_sr != out_sr {
+                    faded_data = Self::resample_rate(&faded_data, last_sr, out_sr);
+                }
+
                 // Write TTS output into AEC reference buffer
                 {
                     let mut ref_buf = tts_ref.lock();
@@ -1285,7 +1307,7 @@ impl VoicePipeline {
                 }
 
                 let packet =
-                    voxy_audio::AudioPacket::new(faded_data, chunk.sample_rate, chunk.channels);
+                    voxy_audio::AudioPacket::new(faded_data, out_sr, self.config.audio.output.channels);
 
                 if let Some(ref mut output) = *self.audio_output.write().await {
                     let _ = output.write(&packet).await;
@@ -1308,6 +1330,30 @@ impl VoicePipeline {
         } else {
             Err(VoiceError::NoTtsEngine)
         }
+    }
+
+    /// Resample audio from one sample rate to another using linear interpolation.
+    pub(crate) fn resample_rate(data: &[f32], from_rate: u32, to_rate: u32) -> Vec<f32> {
+        if data.is_empty() || from_rate == to_rate {
+            return data.to_vec();
+        }
+        let ratio = from_rate as f64 / to_rate as f64;
+        let out_len = (data.len() as f64 / ratio) as usize;
+        let mut out = Vec::with_capacity(out_len);
+        for i in 0..out_len {
+            let pos = i as f64 * ratio;
+            let idx = pos as usize;
+            let frac = pos - idx as f64;
+            let sample = if idx + 1 < data.len() {
+                data[idx] as f64 * (1.0 - frac) + data[idx + 1] as f64 * frac
+            } else if idx < data.len() {
+                data[idx] as f64
+            } else {
+                0.0
+            };
+            out.push(sample as f32);
+        }
+        out
     }
 
     /// Resample audio by speed factor using linear interpolation.
