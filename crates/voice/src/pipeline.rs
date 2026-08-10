@@ -602,6 +602,7 @@ impl VoicePipeline {
                 };
 
                 diagnostics.record_packet_captured(&packet).await;
+                tracing::debug!("[DIAG:MIC_CAPTURE] Captured {} samples at {}Hz", packet.data.len(), packet.sample_rate);
                 if let Some(ref w) = watchdog {
                     w.heartbeat("audio_input");
                 }
@@ -773,6 +774,7 @@ impl VoicePipeline {
                         };
 
                         let stt_latency = stt_start.elapsed().as_millis() as f64;
+                        tracing::info!("[DIAG:STT] Transcription result: '{}' ({}ms)", text, stt_latency);
                         {
                             let mut m = streaming_metrics.write().await;
                             m.stt_latency_ms = stt_latency;
@@ -804,6 +806,7 @@ impl VoicePipeline {
                                 None => String::new(),
                             };
                             let llm_latency = llm_start.elapsed().as_millis() as f64;
+                            tracing::info!("[DIAG:LLM] Response received: {} chars ({}ms)", response.len(), llm_latency);
 
                             if !response.is_empty() {
                                 *last_activity.write().await = Instant::now();
@@ -851,12 +854,15 @@ impl VoicePipeline {
                                             tracing::info!("TTS interrupted");
                                         }
                                         _ = async {
+                                            tracing::info!("[DIAG:TTS] Starting synthesis for: '{}'", response);
                                             if let Some(ref handler) = *event_handler_clone.read().await {
                                                 handler(VoiceEvent::SynthesisStarted { text: response.clone() });
                                             }
                                             let tts_guard = tts_engine_clone.read().await;
                                             if let Some(ref tts) = *tts_guard {
+                                                tracing::info!("[DIAG:TTS] Engine available: {}", tts.name());
                                                 if let Ok(mut stream) = tts.synthesize_stream(&response).await {
+                                                    tracing::info!("[DIAG:TTS] Stream created, reading chunks...");
                                                     let mut first_chunk = true;
                                                     let mut fade_samples_remaining =
                                                         (48000u32 * TTS_FADE_IN_MS / 1000) as usize;
@@ -904,6 +910,7 @@ impl VoicePipeline {
                                                         let pkt = voxy_audio::AudioPacket::new(
                                                             faded_data, chunk.sample_rate, chunk.channels,
                                                         );
+                                                        tracing::debug!("[DIAG:AUDIO_OUTPUT] Writing {} samples to output", pkt.data.len());
                                                         if let Some(ref mut output) = *audio_output_clone.write().await {
                                                             let _ = output.write(&pkt).await;
                                                         }

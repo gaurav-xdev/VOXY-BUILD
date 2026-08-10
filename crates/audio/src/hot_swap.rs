@@ -219,14 +219,8 @@ impl HotSwapManager {
         let shutdown = self.shutdown_signal.clone();
 
         tokio::spawn(async move {
-            loop {
-                tokio::select! {
-                    _ = shutdown.notified() => {
-                        tracing::info!("Hot-swap watcher shutting down");
-                        break;
-                    }
-                }
-            }
+            shutdown.notified().await;
+            tracing::info!("Hot-swap watcher shutting down");
         });
 
         Ok(())

@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "apps/*",
     "crates/*",
+    "tools/*",
 ]
 
 [workspace.package]
@@ -83,4 +84,7 @@ panic = "abort"
 
 [profile.release.build-override]
 opt-level = 3
+
+[patch.crates-io]
+espeak-rs-sys = { path = "crates/espeak-rs-sys-patch" }
 

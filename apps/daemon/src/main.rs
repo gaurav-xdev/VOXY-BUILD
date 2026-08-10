@@ -381,7 +381,7 @@ fn run_pipeline(running: Arc<AtomicBool>, metrics: Arc<VoiceMetrics>) -> Pipelin
         let config = voxy_voice::VoiceConfig {
             auto_start_capture: true,
             wake_word: "hey voxy".into(),
-            wake_word_enabled: true,
+            wake_word_enabled: false,
             vad_enabled: true,
             vad_threshold: 0.05,
             ..Default::default()
@@ -394,13 +394,20 @@ fn run_pipeline(running: Arc<AtomicBool>, metrics: Arc<VoiceMetrics>) -> Pipelin
 
         #[cfg(feature = "whisper-engine")]
         {
+            tracing::info!("[DIAG:STT] Loading Whisper model from models/ggml-base.en.bin...");
             let whisper = voxy_whisper::WhisperSttEngine::new()
                 .with_model_path("models/ggml-base.en.bin".into());
             match whisper.load_model() {
-                Ok(()) => tracing::info!("Whisper model loaded"),
-                Err(e) => tracing::error!("Failed to load whisper model: {e}"),
+                Ok(()) => {
+                    tracing::info!("[DIAG:STT] Whisper model loaded successfully");
+                    pipeline.set_stt_engine(Box::new(whisper)).await?;
+                }
+                Err(e) => {
+                    tracing::error!("[DIAG:STT] Failed to load whisper model: {e}");
+                    tracing::warn!("[DIAG:STT] STT will return empty — whisper model failed to load");
+                    pipeline.set_stt_engine(Box::new(voxy_whisper::WhisperSttEngine::new())).await?;
+                }
             }
-            pipeline.set_stt_engine(Box::new(whisper)).await?;
         }
         #[cfg(not(feature = "whisper-engine"))]
         {
@@ -757,6 +764,7 @@ fn run_pipeline(running: Arc<AtomicBool>, metrics: Arc<VoiceMetrics>) -> Pipelin
                         let response_start = Instant::now();
 
                         // ── 1. Feed transcript → Experience Layer ──────────
+                        tracing::info!("[DIAG:STT] Transcribed text: {}", text);
                         let _ = exp_input.send(ExperienceInput::VoiceTranscript {
                             text: text.clone(),
                             is_final: true,
@@ -936,6 +944,7 @@ fn run_pipeline(running: Arc<AtomicBool>, metrics: Arc<VoiceMetrics>) -> Pipelin
                         );
 
                         // ── 5. Generate response via Ollama LLM ───────────
+                        tracing::info!("[DIAG:LLM] Calling Ollama with prompt length={}", system_prompt.len());
                         let response = match llm
                             .complete(&format!(
                                 "{system_prompt}\n\n{}",
@@ -975,6 +984,7 @@ fn run_pipeline(running: Arc<AtomicBool>, metrics: Arc<VoiceMetrics>) -> Pipelin
                         };
 
                         let elapsed_ms = response_start.elapsed().as_millis();
+                        tracing::info!("[DIAG:LLM] Response generated: {} chars in {}ms", response.len(), elapsed_ms);
                         tracing::info!(
                             input = %text,
                             response_len = response.len(),
@@ -1024,7 +1034,7 @@ fn run_pipeline(running: Arc<AtomicBool>, metrics: Arc<VoiceMetrics>) -> Pipelin
         pipeline.set_response_handler(response_handler).await;
         pipeline.start_listening().await?;
 
-        tracing::info!("VOXY is listening. Say '{}' to activate.", config.wake_word);
+        tracing::info!("VOXY is listening (push-to-talk mode). Speak into your microphone.");
 
         // ── Desktop Event Bridge ──────────────────────────────────────────
         let desktop_config = WorldModelConfig::default();

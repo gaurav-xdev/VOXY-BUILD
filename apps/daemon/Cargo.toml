@@ -9,7 +9,7 @@ name = "voxy-daemon"
 path = "src/main.rs"
 
 [features]
-default = []
+default = ["whisper-engine", "piper-engine"]
 whisper-engine = ["voxy-whisper/whisper-engine"]
 piper-engine = ["voxy-kokoro/piper-engine"]
 
